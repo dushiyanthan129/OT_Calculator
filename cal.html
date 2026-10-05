@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work Hours & OT Tracker Engine</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 850px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        @media (min-width: 768px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+            }
+            .dashboard-card {
+                grid-column: span 2;
+            }
+        }
+        .card {
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box;
+        }
+        h2, h3 {
+            margin-top: 0;
+            color: #1a73e8;
+        }
+        .dashboard-card {
+            background: #1a73e8;
+            color: white;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+        .dashboard-card h2 {
+            color: white;
+            margin-bottom: 5px;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .dashboard-stat {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .input-group {
+            margin-bottom: 14px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #1557b0;
+        }
+        button.checkin-btn {
+            background-color: #34a853;
+        }
+        button.checkin-btn:hover {
+            background-color: #2d8e47;
+        }
+        button.checkout-btn {
+            background-color: #ea4335;
+        }
+        button.checkout-btn:hover {
+            background-color: #c5221f;
+        }
+        button.clear-btn {
+            background-color: #d93025;
+            margin-top: 15px;
+        }
+        button.clear-btn:hover {
+            background-color: #b31412;
+        }
+        .action-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            margin-right: 4px;
+            border-radius: 4px;
+            width: auto;
+        }
+        .edit-btn { background-color: #fbbc05; color: #000; }
+        .edit-btn:hover { background-color: #e0a800; }
+        .delete-btn { background-color: #ea4335; }
+        .delete-btn:hover { background-color: #c5221f; }
+        .table-wrapper {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        th, td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <!-- MONTHLY DASHBOARD COUNTERS -->
+    <div class="card dashboard-card">
+        <div>
+            <h2>Period Selected</h2>
+            <div id="dashMonth" class="dashboard-stat" style="font-size: 20px;">-</div>
+        </div>
+        <div>
+            <h2>Regular Hours</h2>
+            <div id="dashReg" class="dashboard-stat">0h 00m</div>
+        </div>
+        <div>
+            <h2>OT Hours</h2>
+            <div id="dashOt" class="dashboard-stat" style="color: #ffeb3b;">0h 00m</div>
+        </div>
+    </div>
+
+    <!-- ENTRY FORM -->
+    <div class="card">
+        <h3>Log Shift</h3>
+        <div class="input-group">
+            <label for="shiftDate">Date</label>
+            <input type="date" id="shiftDate">
+        </div>
+
+        <div class="btn-group">
+            <button class="checkin-btn" onclick="setCurrentTime('timeIn')">Check-In Now</button>
+            <button class="checkout-btn" onclick="setCurrentTime('timeOut')">Check-Out Now</button>
+        </div>
+
+        <div class="input-group">
+            <label for="timeIn">Clock In Time</label>
+            <input type="time" id="timeIn" value="09:00">
+        </div>
+        <div class="input-group">
+            <label for="timeOut">Clock Out Time</label>
+            <input type="time" id="timeOut" value="17:30">
+        </div>
+        <div class="input-group">
+            <label for="breakMins">Break (Minutes)</label>
+            <select id="breakMins">
+                <option value="0">None</option>
+                <option value="30" selected>30 mins</option>
+                <option value="60">60 mins</option>
+            </select>
+        </div>
+        <button onclick="saveShift()">Save Shift Entry</button>
+    </div>
+
+    <!-- HISTORY AND FILTER -->
+    <div class="card">
+        <h3>History & Filter</h3>
+        <div class="input-group">
+            <label for="filterType">Filter Mode</label>
+            <select id="filterType" onchange="toggleFilterInput()">
+                <option value="month">By Month</option>
+                <option value="day">By Specific Day</option>
+            </select>
+        </div>
+        <div class="input-group" id="monthFilterGroup">
+            <label for="filterMonth">View Month</label>
+            <input type="month" id="filterMonth" onchange="loadDashboard()">
+        </div>
+        <div class="input-group" id="dayFilterGroup" style="display: none;">
+            <label for="filterDay">View Day</label>
+            <input type="date" id="filterDay" onchange="loadDashboard()">
+        </div>
+        
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Net</th>
+                        <th>Reg</th>
+                        <th>OT</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                    <!-- Logs will load dynamically here -->
+                </tbody>
+            </table>
+        </div>
+        <button class="clear-btn" onclick="clearAllData()">Clear All Records</button>
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        
+        document.getElementById('shiftDate').value = `${yyyy}-${mm}-${dd}`;
+        document.getElementById('filterMonth').value = `${yyyy}-${mm}`;
+        document.getElementById('filterDay').value = `${yyyy}-${mm}-${dd}`;
+        
+        loadDashboard();
+    });
+
+    function setCurrentTime(fieldId) {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById(fieldId).value = `${hours}:${minutes}`;
+    }
+
+    function toggleFilterInput() {
+        const filterType = document.getElementById('filterType').value;
+        if (filterType === 'month') {
+            document.getElementById('monthFilterGroup').style.display = 'block';
+            document.getElementById('dayFilterGroup').style.display = 'none';
+        } else {
+            document.getElementById('monthFilterGroup').style.display = 'none';
+            document.getElementById('dayFilterGroup').style.display = 'block';
+        }
+        loadDashboard();
+    }
+
+    function formatHoursAndMinutes(totalMins) {
+        const hours = Math.floor(totalMins / 60);
+        const mins = totalMins % 60;
+        return `${hours}h ${String(mins).padStart(2, '0')}m`;
+    }
+
+    function saveShift() {
+        const dateVal = document.getElementById('shiftDate').value;
+        const timeInStr = document.getElementById('timeIn').value;
+        const timeOutStr = document.getElementById('timeOut').value;
+        const breakMins = parseInt(document.getElementById('breakMins').value, 10);
+
+        if (!dateVal || !timeInStr || !timeOutStr) {
+            alert("Please complete all date and time fields.");
+            return;
+        }
+
+        const [inHrs, inMins] = timeInStr.split(':').map(Number);
+        let [outHrs, outMins] = timeOutStr.split(':').map(Number);
+
+        let inTotalMins = (inHrs * 60) + inMins;
+        let outTotalMins = (outHrs * 60) + outMins;
+
+        if (outTotalMins < inTotalMins) { 
+            outTotalMins += 24 * 60; 
+        }
+
+        let grossMins = outTotalMins - inTotalMins;
+        let netMins = Math.max(0, grossMins - breakMins);
+
+        const dailyThresholdMins = 8 * 60; // 480 minutes (8 hours)
+        
+        let regularMins = 0;
+        let overtimeMins = 0;
+
+        if (netMins > dailyThresholdMins) {
+            regularMins = dailyThresholdMins;
+            overtimeMins = netMins - dailyThresholdMins;
+        } else {
+            regularMins = netMins;
+            overtimeMins = 0;
+        }
+
+        const shiftRecord = {
+            id: Date.now(),
+            date: dateVal,
+            timeIn: timeInStr,
+            timeOut: timeOutStr,
+            breakMins: breakMins,
+            netMins: netMins,
+            regMins: regularMins,
+            otMins: overtimeMins
+        };
+
+        let database = JSON.parse(localStorage.getItem("workLogs")) || [];
+        database = database.filter(item => item.date !== dateVal);
+        database.push(shiftRecord);
+        
+        localStorage.setItem("workLogs", JSON.stringify(database));
+
+        alert("Shift updated and saved successfully!");
+        loadDashboard();
+    }
+
+    function editShift(date) {
+        const database = JSON.parse(localStorage.getItem("workLogs")) || [];
+        const record = database.find(item => item.date === date);
+        
+        if (record) {
+            document.getElementById('shiftDate').value = record.date;
+            document.getElementById('timeIn').value = record.timeIn || "09:00";
+            document.getElementById('timeOut').value = record.timeOut || "17:30";
+            document.getElementById('breakMins').value = record.breakMins || 30;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+
+    function deleteShift(date) {
+        if (confirm(`Do you want to delete shift for ${date}?`)) {
+            let database = JSON.parse(localStorage.getItem("workLogs")) || [];
+            database = database.filter(item => item.date !== date);
+            localStorage.setItem("workLogs", JSON.stringify(database));
+            loadDashboard();
+        }
+    }
+
+    function loadDashboard() {
+        const filterType = document.getElementById('filterType').value;
+        const database = JSON.parse(localStorage.getItem("workLogs")) || [];
+        const historyBody = document.getElementById('historyBody');
+        
+        historyBody.innerHTML = "";
+        let totalRegMins = 0;
+        let totalOtMins = 0;
+
+        database.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        const renderRow = (record) => {
+            const netM = record.netMins !== undefined ? record.netMins : Math.round(record.net * 60);
+            const regM = record.regMins !== undefined ? record.regMins : Math.round(record.reg * 60);
+            const otM = record.otMins !== undefined ? record.otMins : Math.round(record.ot * 60);
+
+            return `<tr>
+                <td>${record.date}</td>
+                <td>${formatHoursAndMinutes(netM)}</td>
+                <td>${formatHoursAndMinutes(regM)}</td>
+                <td style="color: #d93025; font-weight:600;">${formatHoursAndMinutes(otM)}</td>
+                <td>
+                    <button class="action-btn edit-btn" onclick="editShift('${record.date}')">Edit</button>
+                    <button class="action-btn delete-btn" onclick="deleteShift('${record.date}')">X</button>
+                </td>
+            </tr>`;
+        };
+
+        if (filterType === 'month') {
+            const filterMonth = document.getElementById('filterMonth').value;
+            const [year, month] = filterMonth.split('-');
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            document.getElementById('dashMonth').innerText = `${monthNames[parseInt(month)-1]} ${year}`;
+
+            database.forEach(record => {
+                if (record.date.startsWith(filterMonth)) {
+                    totalRegMins += (record.regMins !== undefined ? record.regMins : Math.round(record.reg * 60));
+                    totalOtMins += (record.otMins !== undefined ? record.otMins : Math.round(record.ot * 60));
+                    historyBody.innerHTML += renderRow(record);
+                }
+            });
+        } else {
+            const filterDay = document.getElementById('filterDay').value;
+            document.getElementById('dashMonth').innerText = filterDay;
+
+            database.forEach(record => {
+                if (record.date === filterDay) {
+                    totalRegMins += (record.regMins !== undefined ? record.regMins : Math.round(record.reg * 60));
+                    totalOtMins += (record.otMins !== undefined ? record.otMins : Math.round(record.ot * 60));
+                    historyBody.innerHTML += renderRow(record);
+                }
+            });
+        }
+
+        document.getElementById('dashReg').innerText = formatHoursAndMinutes(totalRegMins);
+        document.getElementById('dashOt').innerText = formatHoursAndMinutes(totalOtMins);
+    }
+
+    function clearAllData() {
+        if (confirm("Are you sure you want to permanently clear all saved tracking logs?")) {
+            localStorage.removeItem("workLogs");
+            loadDashboard();
+        }
+    }
+</script>
+
+</body>
+</html>
